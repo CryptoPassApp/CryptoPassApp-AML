@@ -1,0 +1,17 @@
+[Unit]
+Description=CryptoPassApp API (uvicorn, AML scanner)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/cryptopassapp
+ExecStart=/home/ubuntu/cryptopassapp/.venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 8100
+Restart=always
+RestartSec=5
+MemoryMax=350M
+CPUQuota=80%
+
+[Install]
+WantedBy=multi-user.target

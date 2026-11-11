@@ -1,0 +1,17 @@
+[Unit]
+Description=CryptoPassApp Bot (aiogram, AML scanner)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/cryptopassapp
+ExecStart=/home/ubuntu/cryptopassapp/.venv/bin/python -m bot.main
+Restart=always
+RestartSec=5
+MemoryMax=350M
+CPUQuota=80%
+
+[Install]
+WantedBy=multi-user.target

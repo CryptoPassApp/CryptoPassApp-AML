@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CryptoPass — Real Scan Test</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'SF Pro Display', 'Noto Color Emoji', 'sans-serif'] } } } };
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+<style>
+  .glass { background: rgba(20,24,32,0.55); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.07); }
+  img.emoji { height: 1.15em; width: 1.15em; vertical-align: -0.18em; display: inline-block; }
+</style>
+</head>
+<body class="bg-[#0D0F14] text-white font-sans antialiased">
+<div class="min-h-screen max-w-[430px] mx-auto relative px-4 py-8">
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-24 -left-24 w-[420px] h-[420px] bg-[#00E676] opacity-[0.13] blur-[120px] rounded-full"></div>
+  </div>
+
+  <div class="relative z-10">
+    <h1 class="text-2xl font-bold tracking-tight">🛡️ Real Scan Test</h1>
+    <p class="text-sm text-[#8B93A7] mt-1 mb-5">Проверка реальных адресов через локальный API<br>(нужен запуск: <code class="text-[#00E676]">DEV_BYPASS_AUTH=true uvicorn api.main:app</code>)</p>
+
+    <div class="glass rounded-2xl p-4 mb-3">
+      <input id="addr" type="text" spellcheck="false" placeholder="EQ... / UQ... / 0:... реальный адрес"
+        class="bg-white/[0.06] border border-white/10 rounded-xl px-4 py-3.5 text-white w-full outline-none focus:border-[#00E676] transition-colors text-sm font-mono">
+      <button id="go" class="w-full mt-3 bg-gradient-to-r from-[#00E676] to-[#00C853] text-[#0D0F14] font-bold text-sm rounded-xl py-3.5 shadow-[0_4px_32px_rgba(0,230,118,0.4)] active:scale-95 transition-transform">Сканировать (реальные данные)</button>
+    </div>
+
+    <div id="quick" class="glass rounded-2xl p-4 mb-3">
+      <div class="text-[10px] uppercase tracking-[0.14em] text-[#8B93A7] mb-2">Известные адреса</div>
+      <button data-a="EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs" class="quick-btn block w-full text-left text-xs font-mono text-[#8B93A7] hover:text-[#00E676] transition-colors mb-1.5 break-all">USD₮ (USDT) Jetton Master — проверен</button>
+      <div class="text-[10px] text-[#4A5268]">Свой адрес скопируй из кошелька (Tonkeeper и т.п.)</div>
+    </div>
+
+    <div id="err" class="hidden mb-3 bg-[#FF3D5720] border border-[#FF3D5740] rounded-xl px-4 py-3 text-xs text-[#FF3D57]"></div>
+
+    <div id="loader" class="hidden glass rounded-2xl p-6 mb-3 text-center">
+      <div class="flex gap-1 justify-center mb-3">
+        <div class="w-2 h-2 bg-[#00E676] rounded-full animate-bounce"></div>
+        <div class="w-2 h-2 bg-[#00E676] rounded-full animate-bounce" style="animation-delay:.1s"></div>
+        <div class="w-2 h-2 bg-[#00E676] rounded-full animate-bounce" style="animation-delay:.2s"></div>
+      </div>
+      <div class="text-xs text-[#8B93A7]">Запрос к tonapi.io + AML-анализ…</div>
+    </div>
+
+    <div id="res" class="hidden glass rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-[10px] uppercase tracking-[0.14em] text-[#8B93A7]">Кошелёк</div>
+          <div id="r-addr" class="text-sm font-bold font-mono break-all"></div>
+        </div>
+        <span id="r-badge" class="text-xs font-bold rounded-full px-3 py-1 border"></span>
+      </div>
+      <div class="flex items-center gap-5">
+        <svg viewBox="0 0 120 120" class="w-28 h-28 flex-shrink-0">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#252B3B" stroke-width="8"/>
+          <circle id="r-arc" cx="60" cy="60" r="50" fill="none" stroke="#00E676" stroke-width="8"
+            stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round" transform="rotate(-90 60 60)"
+            style="transition:stroke-dashoffset 1s ease"/>
+          <text id="r-score" x="60" y="68" text-anchor="middle" fill="white" font-size="26" font-weight="800">0</text>
+        </svg>
+        <div class="grid grid-cols-2 gap-2 flex-1 text-center" id="r-metrics"></div>
+      </div>
+      <div class="border-t border-white/10 my-4"></div>
+      <div class="text-[10px] uppercase tracking-[0.14em] font-semibold text-[#8B93A7] mb-2">Флаги риска</div>
+      <div id="r-flags" class="space-y-2"></div>
+      <div id="r-raw" class="mt-4 text-[10px] text-[#4A5268] font-mono break-all"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const LEVELS = { clean:'✅ CLEAN', low:'🟡 LOW', medium:'🟠 MEDIUM', high:'🔴 HIGH', critical:'☠️ BLACKLIST' };
+const COLORS = { clean:'#00E676', low:'#FFD600', medium:'#FF9F43', high:'#FF3D57', critical:'#FF3D57' };
+const FLAG_LABELS = {
+  mixer_interaction:'Взаимодействие с миксерами', sanctioned_address:'Санкционные адреса',
+  p2p_fraud_pattern:'P2P-паттерн мошенничества', high_velocity:'Аномальная активность (>100 tx/24ч)',
+  new_wallet:'Кошелёк моложе 7 дней', darknet_exposure:'Darknet-связи',
+  rug_pull_interaction:'Rug-pull взаимодействие', exchange_only:'Только CEX', old_wallet_clean:'Старый чистый кошелёк'
+};
+
+async function scan(address) {
+  $('err').classList.add('hidden');
+  $('res').classList.add('hidden');
+  $('loader').classList.remove('hidden');
+  try {
+    const resp = await fetch('/api/scan', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address })
+    });
+    const data = await resp.json();
+    $('loader').classList.add('hidden');
+    if (!resp.ok) {
+      const msgs = { 400: 'Некорректный адрес', 401: 'Нет авторизации — запусти сервер с DEV_BYPASS_AUTH=true', 429: 'Дневной лимит сканов исчерпан (FREE: 3/день)', 503: 'tonapi.io недоступен' };
+      $('err').textContent = '❌ ' + (msgs[resp.status] || data.detail || resp.status);
+      $('err').classList.remove('hidden');
+      return;
+    }
+    render(data, address);
+  } catch (e) {
+    $('loader').classList.add('hidden');
+    $('err').textContent = '❌ Сервер недоступен: ' + e.message;
+    $('err').classList.remove('hidden');
+  }
+}
+
+function render(d, address) {
+  $('r-addr').textContent = address.slice(0, 10) + '…' + address.slice(-6);
+  const c = COLORS[d.risk_level] || '#8B93A7';
+  const badge = $('r-badge');
+  badge.textContent = LEVELS[d.risk_level] || d.risk_level;
+  badge.style.color = c; badge.style.borderColor = c + '66'; badge.style.background = c + '22';
+  const score = Math.round(d.trust_score || 0);
+  $('r-arc').style.stroke = c;
+  requestAnimationFrame(() => { $('r-arc').style.strokeDashoffset = String(314 - 314 * score / 100); });
+  animateScore(score, c);
+  const m = d.metrics || {};
+  $('r-metrics').innerHTML = [
+    ['💎', 'Баланс', (m.balance_ton != null ? m.balance_ton : '—') + ' ' + (d.network === 'tron' ? 'TRX' : 'TON')],
+    ['🔄', 'Транзакций', m.transactions_count != null ? m.transactions_count + (m.transactions_more ? '+' : '') : '—'],
+    ['📅', 'Возраст', m.wallet_age_days != null ? m.wallet_age_days + ' дн.' : '—'],
+    ['📊', 'Объём', (m.volume_ton != null ? m.volume_ton : '—') + ' ' + (d.network === 'tron' ? 'TRX' : 'TON')]
+  ].map(x => '<div class="bg-white/[0.06] rounded-xl py-2 px-1"><div class="text-[9px] text-[#8B93A7]">' + x[0] + ' ' + x[1] + '</div><div class="text-xs font-bold mt-0.5">' + x[2] + '</div></div>').join('');
+  const flags = d.flags || [];
+  $('r-flags').innerHTML = flags.length
+    ? flags.map(f => '<div class="text-xs bg-white/[0.06] rounded-lg px-3 py-2" style="color:' + c + '">• ' + (FLAG_LABELS[f] || f) + '</div>').join('')
+    : '<div class="text-xs text-[#00E676] bg-white/[0.06] rounded-lg px-3 py-2">✅ Флагов риска не обнаружено</div>';
+  $('r-raw').textContent = 'scan_id: ' + (d.scan_id || '—') + ' · network: ' + (d.network || 'ton') + ' · risk: ' + d.risk_score + ' · peers: ' + (m.unique_peers != null ? m.unique_peers : '—');
+  $('res').classList.remove('hidden');
+}
+
+let scoreAnim = null;
+function animateScore(target, color) {
+  const el = $('r-score');
+  let cur = 0;
+  clearInterval(scoreAnim);
+  scoreAnim = setInterval(() => {
+    cur += Math.max(1, Math.round((target - cur) / 6));
+    if (cur >= target) { cur = target; clearInterval(scoreAnim); }
+    el.textContent = cur; el.setAttribute('fill', color);
+  }, 30);
+}
+
+$('go').addEventListener('click', () => scan($('addr').value.trim()));
+$('addr').addEventListener('keydown', e => { if (e.key === 'Enter') scan(e.target.value.trim()); });
+document.querySelectorAll('.quick-btn').forEach(b => b.addEventListener('click', () => { $('addr').value = b.getAttribute('data-a'); scan(b.getAttribute('data-a')); }));
+</script>
+</body>
+</html>

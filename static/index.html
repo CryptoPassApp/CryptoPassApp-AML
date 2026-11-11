@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CryptoPass — Web3 Security for TON</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: { fontFamily: { sans: ['Inter', 'SF Pro Display', 'Noto Color Emoji', 'sans-serif'] } } }
+};
+</script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+<style>
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .card-enter { animation: fadeInUp 0.3s ease forwards; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+  body { padding-bottom: env(safe-area-inset-bottom); }
+  #bottom-nav { padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); }
+  #toast { transition: transform .3s ease, opacity .3s ease; }
+  .trust-arc { transition: stroke-dashoffset 1s ease; }
+  /* Twemoji-стикеры */
+  img.emoji { height: 1.15em; width: 1.15em; margin: 0 .06em; vertical-align: -0.18em; display: inline-block; }
+  /* ── Glassmorphism ── */
+  .glass { background: rgba(20,24,32,0.55); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.07); }
+  .glass-2 { background: rgba(26,31,46,0.45); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); }
+  .glass-hero { background: linear-gradient(165deg, rgba(0,230,118,0.12), rgba(20,24,32,0.6) 50%); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); border: 1px solid rgba(0,230,118,0.25); }
+  .glass-nav { background: rgba(13,15,20,0.75); -webkit-backdrop-filter: blur(28px); backdrop-filter: blur(28px); border: 1px solid rgba(255,255,255,0.08); }
+  .nav-tab { border-radius: 9999px; }
+  .nav-tab.text-\[\#00E676\] { background: rgba(0,230,118,0.14); }
+</style>
+</head>
+<body class="bg-[#0D0F14] text-white font-sans antialiased overflow-x-hidden">
+
+<div class="min-h-screen max-w-[430px] mx-auto relative flex flex-col">
+
+  <!-- Декоративный glow -->
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-24 -left-24 w-[420px] h-[420px] bg-[#00E676] opacity-[0.13] blur-[120px] rounded-full"></div>
+    <div class="absolute -bottom-20 -right-20 w-[340px] h-[340px] bg-[#00C853] opacity-10 blur-[120px] rounded-full"></div>
+  </div>
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 px-4 pt-5 pb-3 flex items-center justify-between bg-[#0D0F14]/70 backdrop-blur-xl">
+    <div class="flex items-center gap-2">
+      <div class="w-9 h-9 rounded-xl bg-[#1A1F2E] border border-[#00E67640] flex items-center justify-center">
+        <svg class="w-5 h-5 text-[#00E676]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+      </div>
+      <div>
+        <div class="text-base font-bold leading-tight">CryptoPass</div>
+        <div class="text-[10px] text-[#8B93A7]" data-i18n="header_sub">Web3 Security · TON</div>
+      </div>
+    </div>
+    <button id="header-pro-badge" class="hidden bg-[#00E67620] text-[#00E676] text-xs font-bold rounded-full px-3 py-1 border border-[#00E67640]">⭐ PRO</button>
+  </header>
+
+  <main class="flex-1 px-4 relative z-10 card-enter">
+
+    <!-- ═══════════ ЭКРАН 1: SCANNER ═══════════ -->
+    <section id="screen-scanner">
+      <h1 class="text-2xl font-bold tracking-tight mb-1" data-i18n="scanner_title">🛡️ AML Scanner</h1>
+      <p class="text-sm text-[#8B93A7] mb-4" data-i18n="scanner_sub">Check a TON wallet before the deal</p>
+
+      <!-- Demo banner -->
+      <div id="demo-banner" class="hidden mb-3 bg-[#FFD60015] backdrop-blur-md border border-[#FFD60040] rounded-xl px-4 py-2.5 text-xs font-medium text-[#FFD600]" data-i18n="demo_banner">⚡ Demo Mode — test data is shown</div>
+
+      <div class="glass hover:border-[#00E67640] transition-colors rounded-2xl p-4 mb-3 shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
+        <input id="scanner-input" type="text" spellcheck="false" autocomplete="off"
+          class="glass-2 hover:border-[#00E67640] transition-colors rounded-xl px-4 py-3.5 text-white w-full outline-none focus:border-[#00E676] transition-colors text-sm font-mono"
+          :placeholder="''" data-i18n-ph="scanner_placeholder" placeholder="EQ... or UQ... wallet address">
+        <button id="btn-scan" class="w-full mt-3 bg-gradient-to-r from-[#00E676] to-[#00C853] text-[#0D0F14] font-bold text-sm rounded-xl py-3.5 px-6 shadow-[0_4px_32px_rgba(0,230,118,0.4)] active:scale-95 transition-transform" data-i18n="scan_btn">Scan wallet</button>
+      </div>
+
+      <!-- Demo presets -->
+      <div id="demo-presets" class="hidden mb-3">
+        <div class="text-[10px] uppercase tracking-[0.14em] font-semibold text-[#8B93A7] mb-2" data-i18n="demo_presets_label">Demo presets</div>
+        <div class="flex gap-2">
+          <button data-preset="clean" class="preset-btn flex-1 glass-2 text-[#8B93A7] font-medium text-xs rounded-full px-4 py-2 shadow-[0_4px_16px_rgba(0,230,118,0.25)] active:bg-[#00E67620] transition-colors">✅ Clean</button>
+          <button data-preset="medium" class="preset-btn flex-1 glass-2 text-[#8B93A7] font-medium text-xs rounded-full px-4 py-2 shadow-[0_4px_16px_rgba(255,159,67,0.25)] active:bg-[#00E67620] transition-colors">🟠 Medium</button>
+          <button data-preset="critical" class="preset-btn flex-1 glass-2 text-[#8B93A7] font-medium text-xs rounded-full px-4 py-2 shadow-[0_4px_16px_rgba(255,61,87,0.3)] active:bg-[#00E67620] transition-colors">🔴 Critical</button>
+        </div>
+      </div>
+
+      <!-- Loader -->
+      <div id="scan-loader" class="hidden card-enter">
+        <div class="glass hover:border-[#00E67640] transition-colors rounded-2xl p-4 mb-3">
+          <div class="flex gap-1 justify-center py-6">
+            <div class="w-2 h-2 bg-[#00E676] rounded-full animate-bounce" style="animation-delay:0s"></div>
+            <div class="w-2 h-2 bg-[#00E676] rounded-full animate-bounce" style="animation-delay:0.1s"></div>
+            <div class="w-2 h-2 bg-[#00E676] rounded-full animate-bounce" style="animation-delay:0.2s"></div>
+          </div>
+          <div class="text-center text-xs text-[#8B93A7]" data-i18n="scanning">Scanning wallet…</div>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div id="scan-result" class="hidden card-enter">
+        <div class="glass-2 hover:border-[#00E67640] transition-colors rounded-2xl p-5 mb-3 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="text-[10px] uppercase tracking-[0.14em] text-[#8B93A7] mb-0.5" data-i18n="wallet">Wallet</div>
+              <div id="res-address" class="text-sm font-bold font-mono tracking-wider break-all">—</div>
+            </div>
+            <span id="res-risk-badge" class="inline-flex items-center gap-1 text-xs font-bold rounded-full px-3 py-1 border">—</span>
+          </div>
+
+          <div class="flex items-center gap-5">
+            <!-- Trust ring -->
+            <svg viewBox="0 0 120 120" class="w-28 h-28 flex-shrink-0">
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#252B3B" stroke-width="8"/>
+              <circle id="res-ring-arc" class="trust-arc" cx="60" cy="60" r="50" fill="none" stroke="#00E676" stroke-width="8"
+                stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round" transform="rotate(-90 60 60)"/>
+              <text id="res-ring-value" x="60" y="68" text-anchor="middle" fill="white" font-size="26" font-weight="800">0</text>
+            </svg>
+            <div class="flex-1">
+              <div class="text-[10px] uppercase tracking-[0.14em] text-[#8B93A7] mb-1.5" data-i18n="trust_score">Trust Score</div>
+              <div class="w-full bg-[#252B3B] rounded-full h-2 mb-2">
+                <div id="res-progress" class="bg-gradient-to-r from-[#00E676] to-[#00C853] h-2 rounded-full transition-all duration-1000" style="width:0%"></div>
+              </div>
+              <div id="res-story" class="text-xs text-[#8B93A7] leading-relaxed"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="res-flags-card" class="glass hover:border-[#00E67640] transition-colors rounded-2xl p-4 mb-3 hidden">
+          <div class="text-[10px] uppercase tracking-[0.14em] font-semibold text-[#8B93A7] mb-2" data-i18n="risk_flags">Risk flags</div>
+          <div id="res-flags" class="space-y-2"></div>
+        </div>
+
+        <div class="flex gap-2 mb-2">
+          <button id="btn-new-scan" class="flex-1 bg-transparent border border-[#252B3B] text-[#8B93A7] font-medium text-sm rounded-xl py-3 hover:border-[#00E676] hover:text-white transition-colors" data-i18n="new_scan">🔄 New scan</button>
+          <button id="btn-view-passport" class="flex-1 bg-gradient-to-r from-[#00E676] to-[#00C853] text-[#0D0F14] font-bold text-sm rounded-xl py-3 shadow-[0_4px_24px_rgba(0,230,118,0.35)] active:scale-95 transition-transform" data-i18n="view_passport">🪪 Passport</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ ЭКРАН 2: PASSPORT ═══════════ -->
+    <section id="screen-passport" class="hidden">
+      <h1 class="text-2xl font-bold tracking-tight mb-1" data-i18n="passport_title">🪪 Trust Passport</h1>
+      <p class="text-sm text-[#8B93A7] mb-4" data-i18n="passport_sub">Web3 reputation profile</p>
+
+      <div id="passport-empty" class="hidden">
+        <div class="glass rounded-2xl p-8 text-center">
+          <div class="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#00E676]/25 to-[#1A1F2E] border border-[#00E67660] flex items-center justify-center mx-auto shadow-[0_0_24px_rgba(0,230,118,0.35)] mb-4">
+            <span class="text-3xl">🪪</span>
+          </div>
+          <div class="text-base font-bold mb-1" data-i18n="passport_empty_title">No passport yet</div>
+          <p class="text-xs text-[#8B93A7] leading-relaxed mb-5" data-i18n="passport_empty_sub">Scan any TON or TRON wallet — its reputation profile with Trust Score, radar and history will appear here.</p>
+          <button id="btn-passport-go-scan" class="bg-gradient-to-r from-[#00E676] to-[#00C853] text-[#0D0F14] font-bold text-sm rounded-xl px-6 py-3 shadow-[0_4px_24px_rgba(0,230,118,0.35)] active:scale-95 transition-transform" data-i18n="passport_empty_cta">🛡️ Scan a wallet</button>
+        </div>
+      </div>
+
+      <div id="passport-content" class="relative">
+        <div class="glass-hero rounded-2xl p-5 mb-3 shadow-[0_4px_24px_rgba(0,230,118,0.08)] text-center">
+          <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-[#00E676]/25 to-[#1A1F2E] border border-[#00E67660] flex items-center justify-center mx-auto shadow-[0_0_24px_rgba(0,230,118,0.35)]">
+            <span id="pp-avatar-initials" class="text-lg font-black text-[#00E676]">--</span>
+          </div>
+          <div id="pp-address" class="text-sm font-mono text-[#8B93A7] mt-2 break-all">—</div>
+          <div id="pp-score" class="text-6xl font-black text-[#00E676] mt-3 leading-none">—</div>
+          <div class="text-[10px] uppercase tracking-[0.14em] text-[#8B93A7] mt-1" data-i18n="trust_score">Trust Score</div>
+          <div id="pp-label" class="text-sm font-semibold mt-2">—</div>
+          <div id="pp-rank" class="text-xs text-[#FFD600] font-bold mt-1">—</div>
+        </div>
+
+        <!-- Radar -->
+        <div class="glass hover:border-[#00E67640] transition-colors rounded-2xl p-4 mb-3">
+          <div class="text-[10px] uppercase tracking-[0.14em] font-semibold text-[#8B93A7] mb-2" data-i18n="radar_title">Reputation radar</div>
+          <div class="flex justify-center">
+            <svg id="radar-svg" viewBox="-65 0 320 200" class="w-full max-w-[300px]"></svg>
+          </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="grid grid-cols-2 gap-2 mb-3" id="pp-metrics"></div>
+
+        <!-- Recent txs -->
+        <div class="glass hover:border-[#00E67640] transition-colors rounded-2xl p-4 mb-3">
+          <div class="text-[10px] uppercase tracking-[0.14em] font-semibold text-[#8B93A7] mb-3" data-i18n="recent_txs">Recent transactions</div>
+          <div id="pp-txs" class="space-y-2"></div>
+        </div>
+
+        <!-- Lock overlay (FREE) -->
+        <div id="passport-lock" class="hidden absolute inset-0 z-20 rounded-2xl bg-[#0D0F14]/80 backdrop-blur-md flex flex-col items-center justify-center gap-3">
+          <svg class="w-10 h-10 text-[#FFD600]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <div class="text-sm font-semibold" data-i18n="passport_locked">Trust Passport is PRO-only</div>
+          <button id="btn-unlock-passport" class="bg-gradient-to-r from-[#00E676] to-[#00C853] text-[#0D0F14] font-bold text-sm rounded-xl px-6 py-3 shadow-[0_4px_24px_rgba(0,230,118,0.35)] active:scale-95 transition-transform" data-i18n="unlock_pro">Unlock PRO</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ ЭКРАН 3: HISTORY ═══════════ -->
+    <section id="screen-history" class="hidden">
+      <h1 class="text-2xl font-bold tracking-tight mb-1" data-i18n="history_title">🕐 History</h1>
+      <p class="text-sm text-[#8B93A7] mb-4" data-i18n="history_sub">Your previous scans</p>
+
+      <div id="history-lock" class="hidden glass hover:border-[#00E67640] transition-colors rounded-2xl p-6 text-center mb-3">
+        <svg class="w-10 h-10 text-[#FFD600] mx-auto mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div class="text-sm font-semibold mb-3" data-i18n="history_locked">Scan history is PRO-only</div>
+        <button id="btn-unlock-history" class="bg-gradient-to-r from-[#00E676] to-[#00C853] text-[#0D0F14] font-bold text-sm rounded-xl px-6 py-3 shadow-[0_4px_24px_rgba(0,230,118,0.35)] active:scale-95 transition-transform" data-i18n="unlock_pro">Unlock PRO</button>
+      </div>
+
+      <div id="history-list" class="space-y-2"></div>
+    </section>
+
+    <!-- ═══════════ ЭКРАН 4: PROFILE ═══════════ -->
+    <section id="screen-profile" class="hidden">
+      <h1 class="text-2xl font-bold tracking-tight mb-4" data-i18n="profile_title">👤 Profile</h1>
+
+      <div class="glass hover:border-[#00E67640] transition-colors rounded-2xl p-5 mb-3 text-center">
+        <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-[#00E676]/25 to-[#1A1F2E] border border-[#00E67660] flex items-center justify-center mx-auto shadow-[0_0_24px_rgba(0,230,118,0.35)]">
+          <svg class="w-7 h-7 text-[#00E676]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div id="pr-name" class="text-lg font-bold mt-2">Demo User</div>
+        <div id="pr-id" class="text-xs text-[#4A5268] font-mono">ID 000000000</div>
+
+        <div class="mt-3 flex justify-center">
+          <span id="pr-status-badge" class="inline-flex items-center gap-1 bg-[#FFD60020] text-[#FFD600] text-xs font-bold rounded-full px-3 py-1 border border-[#FFD60040]">🔒 LIMITED</span>
+        </div>
+        <div id="pr-pro-until" class="hidden text-xs text-[#00E676] mt-2"></div>
+
+        <div id="pr-limits-block">
+        <div class="border-t border-[#252B3B] my-4"></div>
+
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[10px] uppercase tracking-[0.14em] text-[#8B93A7]" data-i18n="scans_today">Scans today</span>
+          <span id="pr-scans-text" class="text-xs font-bold">0/3</span>
+        </div>
+        <div class="w-full bg-[#252B3B] rounded-full h-2">
+          <div id="pr-scans-progress" class="bg-gradient-to-r from-[#00E676] to-[#00C853] h-2 rounded-full transition-all duration-500" style="width:0%"></div>
+        </div>
+        </div>
+      </div>
+
+      <!-- Upgrade card (FREE only) -->
+      <div id="profile-upgrade" class="glass-hero rounded-2xl p-5 mb-3 shadow-[0_4px_24px_rgba(0,230,118,0.08)]">
+        <div class="text-sm font-bold mb-1" data-i18n="upgrade_title">Get unlimited access</div>
+        <div class="text-xs text-[#8B93A7] mb-3" data-i18n="upgrade_sub">50 scans/day · Passport · P2P Radar · History</div>
+        <button id="btn-upgrade-profile" class="w-full bg-gradient-to-r from-[#00E676] to-[#00C853] text-[#0D0F14] font-bold text-sm rounded-xl py-3.5 shadow-[0_4px_24px_rgba(0,230,118,0.35)] active:scale-95 transition-transform" data-i18n="get_pro_access">Get unlimited Access</button>
+      </div>
+
+      <!-- Menu -->
+      <div id="row-support" class="flex items-center justify-between px-4 py-3.5 glass hover:border-[#00E67640] transition-colors rounded-xl mb-2 cursor-pointer hover:bg-[#1A1F2E] transition-colors">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg glass-2 hover:border-[#00E67640] transition-colors flex items-center justify-center">💬</div>
+          <span class="text-sm font-medium" data-i18n="menu_support">Support</span>
+        </div>
+        <svg class="w-4 h-4 text-[#4A5268]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </div>
+
+      <div id="row-language" class="flex items-center justify-between px-4 py-3.5 glass hover:border-[#00E67640] transition-colors rounded-xl mb-2 cursor-pointer hover:bg-[#1A1F2E] transition-colors">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg glass-2 hover:border-[#00E67640] transition-colors flex items-center justify-center">🌐</div>
+          <span class="text-sm font-medium" data-i18n="menu_language">Language</span>
+        </div>
+        <div class="flex gap-2">
+          <button id="lang-ru" class="text-xs font-bold rounded-full px-3 py-1 border transition-colors">🇷🇺 RU</button>
+          <button id="lang-en" class="text-xs font-bold rounded-full px-3 py-1 border transition-colors">🇬🇧 EN</button>
+        </div>
+      </div>
+
+      <div id="row-pro" class="flex items-center justify-between px-4 py-3.5 glass hover:border-[#00E67640] transition-colors rounded-xl mb-2 cursor-pointer hover:bg-[#1A1F2E] transition-colors">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-[#1A1F2E] border border-[#252B3B] flex items-center justify-center">⭐</div>
+          <span class="text-sm font-medium" data-i18n="menu_pro">PRO Subscription</span>
+        </div>
+        <span id="row-pro-status" class="flex items-center"><svg class="w-4 h-4 text-[#4A5268]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+      </div>
+
+      <div id="row-about" class="flex items-center justify-between px-4 py-3.5 glass hover:border-[#00E67640] transition-colors rounded-xl mb-2 cursor-pointer hover:bg-[#1A1F2E] transition-colors">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg glass-2 hover:border-[#00E67640] transition-colors flex items-center justify-center">ℹ️</div>
+          <span class="text-sm font-medium" data-i18n="menu_about">About</span>
+        </div>
+        <svg class="w-4 h-4 text-[#4A5268]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </div>
+
+      <div id="row-share" class="flex items-center justify-between px-4 py-3.5 glass hover:border-[#00E67640] transition-colors rounded-xl mb-2 cursor-pointer hover:bg-[#1A1F2E] transition-colors">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg glass-2 hover:border-[#00E67640] transition-colors flex items-center justify-center">📤</div>
+          <span class="text-sm font-medium" data-i18n="menu_share">Share App</span>
+        </div>
+        <svg class="w-4 h-4 text-[#4A5268]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </div>
+    </section>
+
+    <div class="h-24"></div>
+  </main>
+
+  <!-- ═══════════ НИЖНЕЕ МЕНЮ ═══════════ -->
+  <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto px-4 z-50">
+    <div class="glass-nav rounded-full p-1.5 flex justify-around items-center shadow-[0_8px_32px_rgba(0,0,0,0.55)]">
+      <button data-tab="scanner" class="nav-tab flex flex-col items-center gap-1 py-1 px-3 transition-colors">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="11" cy="11" r="1"/><path d="m21 21-4.3-4.3"/></svg>
+        <span class="text-[10px] font-medium" data-i18n="tab_scanner">Scanner</span>
+      </button>
+      <button data-tab="passport" class="nav-tab flex flex-col items-center gap-1 py-1 px-3 transition-colors">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M13 9h5M13 13h5M13 17h3"/></svg>
+        <span class="text-[10px] font-medium" data-i18n="tab_passport">Passport</span>
+      </button>
+      <button data-tab="history" class="nav-tab flex flex-col items-center gap-1 py-1 px-3 transition-colors">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <span class="text-[10px] font-medium" data-i18n="tab_history">History</span>
+      </button>
+      <button data-tab="profile" class="nav-tab flex flex-col items-center gap-1 py-1 px-3 transition-colors">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="text-[10px] font-medium" data-i18n="tab_profile">Profile</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ═══════════ ЭКРАН 5: PRO PAYWALL ═══════════ -->
+  <div id="paywall" class="hidden fixed inset-0 z-[100] bg-[#0D0F14]/95 backdrop-blur-sm overflow-y-auto">
+    <div class="max-w-[430px] mx-auto px-4 py-8">
+      <div class="flex justify-end">
+        <button id="btn-close-paywall" class="w-9 h-9 rounded-full glass-2 hover:border-[#00E67640] transition-colors flex items-center justify-center text-[#8B93A7]">✕</button>
+      </div>
+
+      <div class="text-center mb-6">
+        <div class="w-20 h-20 rounded-full bg-[#00E67620] border-2 border-[#00E676] flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(0,230,118,0.35)]">
+          <span class="text-3xl">⭐</span>
+        </div>
+        <h2 class="text-2xl font-bold tracking-tight mt-4" data-i18n="paywall_title">Unlock PRO</h2>
+        <p class="text-sm text-[#8B93A7] mt-1" data-i18n="paywall_sub">Full power of CryptoPass</p>
+      </div>
+
+      <div class="space-y-2 mb-6">
+        <div class="flex items-center gap-3 glass hover:border-[#00E67640] transition-colors rounded-xl px-4 py-3">
+          <span class="text-xl">🔍</span>
+          <span class="text-sm font-medium" data-i18n="paywall_b1">50 scans per day (vs 3 in FREE)</span>
+        </div>
+        <div class="flex items-center gap-3 glass hover:border-[#00E67640] transition-colors rounded-xl px-4 py-3">
+          <span class="text-xl">🪪</span>
+          <span class="text-sm font-medium" data-i18n="paywall_b2">Web3 Trust Passport for any wallet</span>
+        </div>
+        <div class="flex items-center gap-3 glass hover:border-[#00E67640] transition-colors rounded-xl px-4 py-3">
+          <span class="text-xl">📡</span>
+          <span class="text-sm font-medium" data-i18n="paywall_b3">P2P Security Radar + full history</span>
+        </div>
+      </div>
+
+      <div class="space-y-3 mb-4">
+        <button id="btn-buy-week" class="w-full glass rounded-2xl p-4 flex items-center justify-between hover:border-[#00E676] transition-colors">
+          <div class="text-left">
+            <div class="text-sm font-bold" data-i18n="plan_week">PRO · 1 week</div>
+            <div class="text-xs text-[#8B93A7]" data-i18n="plan_week_sub">Starter — all PRO features</div>
+          </div>
+          <div class="text-lg font-black text-[#00E676]">75 ⭐</div>
+        </button>
+
+        <button id="btn-buy-month" class="w-full glass rounded-2xl p-4 flex items-center justify-between hover:border-[#00E676] transition-colors">
+          <div class="text-left">
+            <div class="text-sm font-bold" data-i18n="plan_month">PRO · 1 month</div>
+            <div class="text-xs text-[#8B93A7]" data-i18n="plan_month_sub">50 scans per day</div>
+          </div>
+          <div class="text-lg font-black text-[#00E676]">150 ⭐</div>
+        </button>
+
+        <div class="relative">
+          <span class="absolute -top-2 right-4 bg-[#00E676] text-[#0D0F14] text-[10px] font-black rounded-full px-2 py-0.5" data-i18n="best_value">BEST VALUE</span>
+          <button id="btn-buy-year" class="w-full bg-[#1A1F2E] border border-[#00E67640] rounded-2xl p-4 flex items-center justify-between shadow-[0_4px_24px_rgba(0,230,118,0.08)]">
+            <div class="text-left">
+              <div class="text-sm font-bold" data-i18n="plan_year">PRO · 1 year</div>
+              <div class="text-xs text-[#8B93A7]" data-i18n="plan_year_sub">Unlimited + all features</div>
+            </div>
+            <div class="text-lg font-black text-[#00E676]">999 ⭐</div>
+          </button>
+        </div>
+      </div>
+
+      <button id="btn-restore" class="w-full text-center text-xs text-[#4A5268] underline" data-i18n="restore">Already paid? Restore purchase</button>
+    </div>
+  </div>
+
+  <!-- About overlay -->
+  <div id="about-overlay" class="hidden fixed inset-0 z-[100] bg-[#0D0F14]/95 backdrop-blur-sm flex items-center justify-center px-6">
+    <div class="max-w-[380px] w-full glass hover:border-[#00E67640] transition-colors rounded-2xl p-6 text-center">
+      <div class="text-3xl mb-3">🛡️</div>
+      <div class="text-lg font-bold mb-2">CryptoPass v1.0</div>
+      <p class="text-xs text-[#8B93A7] leading-relaxed mb-5" data-i18n="about_text">Web3 security toolkit for TON: AML wallet scanner, Trust Passport and P2P Security Radar. Risk scores are heuristic estimates, not financial advice.</p>
+      <button id="btn-close-about" class="bg-gradient-to-r from-[#00E676] to-[#00C853] text-[#0D0F14] font-bold text-sm rounded-xl px-8 py-3 active:scale-95 transition-transform">OK</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-24 left-4 right-4 max-w-[430px] mx-auto glass hover:border-[#00E67640] transition-colors rounded-xl px-4 py-3 text-sm text-white shadow-xl translate-y-16 opacity-0 z-[110] pointer-events-none"></div>
+
+</div>
+
+<script>
+'use strict';
+
+/* ════════════════ ИНИЦИАЛИЗАЦИЯ ════════════════ */
+
+const TG = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+const IS_DEMO = !(TG && TG.initDataUnsafe && TG.initDataUnsafe.user);
+const API = ''; // тот же origin
+
+// Локальная разработка: страница открыта с запущенного API -> используем реальные данные
+const IS_LOCALHOST = /^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+let REAL_MODE = false;
+
+if (TG) { TG.ready(); TG.expand(); if (TG.setHeaderColor) { try { TG.setHeaderColor('#0D0F14'); } catch (e) {} } }
+
+/* ════════════════ I18N ════════════════ */
+
+const i18n = {
+  ru: {
+    header_sub: 'Безопасность Web3 · TON',
+    scanner_title: '🛡️ AML Scanner',
+    scanner_sub: 'Проверь TON-кошелёк перед сделкой',
+    demo_banner: '⚡ Demo Mode — показаны тестовые данные',
+    scanner_placeholder: 'EQ... или UQ... адрес кошелька',
+    scan_btn: 'Сканировать',
+    demo_presets_label: 'Demo-пресеты',
+    scanning: 'Сканирую кошелёк…',
+    wallet: 'Кошелёк',
+    trust_score: 'Trust Score',
+    risk_flags: 'Флаги риска',
+    no_flags: 'Флагов риска не обнаружено',
+    new_scan: '🔄 Новая проверка',
+    view_passport: '🪪 Паспорт',
+    passport_title: '🪪 Trust Passport',
+    passport_sub: 'Профиль репутации Web3',
+    passport_locked: 'Trust Passport доступен только в PRO',
+    passport_empty_title: 'Паспорт пока пуст',
+    passport_empty_sub: 'Отсканируй любой кошелёк TON или TRON — здесь появится его профиль репутации: Trust Score, радар и история.',
+    passport_empty_cta: '🛡️ Сканировать кошелёк',
+    radar_title: 'Радар репутации',
+    recent_txs: 'Последние транзакции',
+    metric_age: 'Возраст', metric_balance: 'Баланс', metric_txs: 'Транзакций', metric_volume: 'Объём', metric_rank: 'Ранг', metric_peers: 'Контактов',
+    days: 'дн.',
+    history_title: '🕐 История',
+    history_sub: 'Твои предыдущие проверки',
+    history_locked: 'История сканов доступна только в PRO',
+    history_empty: 'Пока пусто — сделай первую проверку в Scanner',
+    profile_title: '👤 Профиль',
+    scans_today: 'Сканирований сегодня',
+    upgrade_title: 'Получи безлимитный доступ',
+    upgrade_sub: '50 сканов/день · Паспорт · P2P Радар · История',
+    get_pro_access: 'Безлимитный доступ',
+    menu_support: 'Поддержка',
+    menu_pro: 'Подписка PRO',
+    pro_active: 'Активна',
+    menu_language: 'Язык',
+    menu_about: 'О приложении',
+    menu_share: 'Поделиться',
+    tab_scanner: 'Scanner', tab_passport: 'Passport', tab_history: 'History', tab_profile: 'Profile',
+    paywall_title: 'Открыть PRO',
+    paywall_sub: 'Полная мощь CryptoPass',
+    paywall_b1: '50 сканов в день (вместо 3 в FREE)',
+    paywall_b2: 'Web3 Trust Passport для любого кошелька',
+    paywall_b3: 'P2P Security Radar + вся история',
+    plan_week: 'PRO · 1 неделя', plan_week_sub: 'Старт — все функции PRO',
+    plan_month: 'PRO · 1 месяц', plan_month_sub: '50 сканов в день',
+    plan_year: 'PRO · 1 год', plan_year_sub: 'Безлимит + все функции',
+    best_value: 'ВЫГОДНО',
+    restore: 'Уже оплатил? Восстановить покупку',
+    about_text: 'Инструмент Web3-безопасности для TON: AML-сканер кошельков, Trust Passport и P2P Security Radar. Оценки риска — эвристические, не являются финансовой рекомендацией.',
+    toast_limit: '⚠️ Дневной лимит сканов исчерпан',
+    toast_invalid: '❌ Некорректный TON-адрес',
+    toast_error: '⚠️ Сервис временно недоступен',
+    toast_lang: '✅ Язык изменён',
+    toast_demo_pay: '⚡ Demo Mode: оплата недоступна',
+    toast_shared: '✅ Открыто окно шаринга',
+    pro_until: 'PRO до {date}',
+    level: { clean: '✅ ЧИСТЫЙ', low: '🟡 НИЗКИЙ РИСК', medium: '🟠 СРЕДНИЙ РИСК', high: '🔴 ВЫСОКИЙ РИСК', critical: '☠️ BLACKLIST' },
+    flagLabels: {
+      mixer_interaction: '🎰 Взаимодействие с миксерами',
+      sanctioned_address: '🚫 Связь с санкционными адресами',
+      p2p_fraud_pattern: '⚠️ P2P-паттерн мошенничества',
+      high_velocity: '⚡ Аномальная активность (>100 tx/24ч)',
+      new_wallet: '🆕 Кошелёк моложе 7 дней',
+      darknet_exposure: '🕸️ Связь с darknet-адресами',
+      rug_pull_interaction: '🎭 Взаимодействие с rug-pull',
+      exchange_only: '🏦 Только CEX-транзакции',
+      old_wallet_clean: '🏛️ Старый кошелёк без флагов'
+    }
+  },
+  en: {
+    header_sub: 'Web3 Security · TON',
+    scanner_title: '🛡️ AML Scanner',
+    scanner_sub: 'Check a TON wallet before the deal',
+    demo_banner: '⚡ Demo Mode — test data is shown',
+    scanner_placeholder: 'EQ... or UQ... wallet address',
+    scan_btn: 'Scan wallet',
+    demo_presets_label: 'Demo presets',
+    scanning: 'Scanning wallet…',
+    wallet: 'Wallet',
+    trust_score: 'Trust Score',
+    risk_flags: 'Risk flags',
+    no_flags: 'No risk flags detected',
+    new_scan: '🔄 New scan',
+    view_passport: '🪪 Passport',
+    passport_title: '🪪 Trust Passport',
+    passport_sub: 'Web3 reputation profile',
+    passport_locked: 'Trust Passport is PRO-only',
+    passport_empty_title: 'No passport yet',
+    passport_empty_sub: 'Scan any TON or TRON wallet — its reputation profile with Trust Score, radar and history will appear here.',
+    passport_empty_cta: '🛡️ Scan a wallet',
+    radar_title: 'Reputation radar',
+    recent_txs: 'Recent transactions',
+    metric_age: 'Age', metric_balance: 'Balance', metric_txs: 'Transactions', metric_volume: 'Volume', metric_rank: 'Rank', metric_peers: 'Peers',
+    days: 'days',
+    history_title: '🕐 History',
+    history_sub: 'Your previous scans',
+    history_locked: 'Scan history is PRO-only',
+    history_empty: 'Nothing yet — make your first scan in Scanner',
+    profile_title: '👤 Profile',
+    scans_today: 'Scans today',
+    upgrade_title: 'Get unlimited access',
+    upgrade_sub: '50 scans/day · Passport · P2P Radar · History',
+    get_pro_access: 'Get unlimited Access',
+    menu_support: 'Support',
+    menu_pro: 'PRO Subscription',
+    pro_active: 'Active',
+    menu_language: 'Language',
+    menu_about: 'About',
+    menu_share: 'Share App',
+    tab_scanner: 'Scanner', tab_passport: 'Passport', tab_history: 'History', tab_profile: 'Profile',
+    paywall_title: 'Unlock PRO',
+    paywall_sub: 'Full power of CryptoPass',
+    paywall_b1: '50 scans per day (vs 3 in FREE)',
+    paywall_b2: 'Web3 Trust Passport for any wallet',
+    paywall_b3: 'P2P Security Radar + full history',
+    plan_week: 'PRO · 1 week', plan_week_sub: 'Starter — all PRO features',
+    plan_month: 'PRO · 1 month', plan_month_sub: '50 scans per day',
+    plan_year: 'PRO · 1 year', plan_year_sub: 'Unlimited + all features',
+    best_value: 'BEST VALUE',
+    restore: 'Already paid? Restore purchase',
+    about_text: 'Web3 security toolkit for TON: AML wallet scanner, Trust Passport and P2P Security Radar. Risk scores are heuristic estimates, not financial advice.',
+    toast_limit: '⚠️ Daily scan limit reached',
+    toast_invalid: '❌ Invalid TON address',
+    toast_error: '⚠️ Service temporarily unavailable',
+    toast_lang: '✅ Language changed',
+    toast_demo_pay: '⚡ Demo Mode: payment unavailable',
+    toast_shared: '✅ Share dialog opened',
+    pro_until: 'PRO until {date}',
+    level: { clean: '✅ CLEAN', low: '🟡 LOW RISK', medium: '🟠 MEDIUM RISK', high: '🔴 HIGH RISK', critical: '☠️ BLACKLIST' },
+    flagLabels: {
+      mixer_interaction: '🎰 Mixer interaction',
+      sanctioned_address: '🚫 Sanctioned address exposure',
+      p2p_fraud_pattern: '⚠️ P2P fraud pattern',
+      high_velocity: '⚡ High velocity (>100 tx/24h)',
+      new_wallet: '🆕 Wallet younger than 7 days',
+      darknet_exposure: '🕸️ Darknet exposure',
+      rug_pull_interaction: '🎭 Rug-pull interaction',
+      exchange_only: '🏦 CEX-only transactions',
+      old_wallet_clean: '🏛️ Old wallet, no flags'
+    }
+  }
+};
+
+let currentLang = localStorage.getItem('lang') || (TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.language_code === 'ru' ? 'ru' : (TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.language_code ? 'en' : 'ru'));
+
+function tr(key) {
+  const pack = i18n[currentLang] || i18n.ru;
+  return pack[key] !== undefined ? pack[key] : (i18n.ru[key] !== undefined ? i18n.ru[key] : key);
+}
+
+/* Twemoji: заменяет текстовые эмодзи на SVG-стикеры (Twitter). Безопасно при недоступном CDN. */
+function hydrateEmoji(root) {
+  try {
+    if (window.twemoji && window.twemoji.parse) {
+      window.twemoji.parse(root || document.body, { folder: 'svg', ext: '.svg' });
+    }
+  } catch (e) { /* эмодзи останутся шрифтовыми */ }
+}
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const v = tr(el.getAttribute('data-i18n'));
+    if (typeof v === 'string') el.textContent = v;
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const v = tr(el.getAttribute('data-i18n-ph'));
+    if (typeof v === 'string') el.setAttribute('placeholder', v);
+  });
+  document.documentElement.lang = currentLang;
+  updateLangButtons();
+  hydrateEmoji(document.body);
+}
+
+/* ════════════════ DEMO PRESETS ════════════════ */
+
+const DEMO_PRESETS = {
+  clean: {
+    address: 'EQD_DEMO_CLEAN_000000000000000000000000000000000',
+    trust_score: 94, risk_score: 6, risk_level: 'clean', flags: [],
+    balance_ton: 15.42, transactions_count: 847, wallet_age_days: 412,
+    first_seen: '2023-04-15', last_activity: '2024-10-20',
+    story: 'Verified P2P trader. Clean history. Recommended for deals.'
+  },
+  medium: {
+    address: 'EQD_DEMO_MEDIUM_00000000000000000000000000000000',
+    trust_score: 51, risk_score: 49, risk_level: 'medium',
+    flags: ['high_velocity', 'new_wallet', 'p2p_fraud_pattern'],
+    balance_ton: 3.17, transactions_count: 234, wallet_age_days: 23,
+    first_seen: '2024-10-01', last_activity: '2024-10-23',
+    story: 'New wallet with suspicious P2P patterns. Proceed with caution.'
+  },
+  critical: {
+    address: 'EQD_DEMO_CRITICAL_0000000000000000000000000000000',
+    trust_score: 8, risk_score: 92, risk_level: 'critical',
+    flags: ['mixer_interaction', 'sanctioned_address', 'darknet_exposure', 'p2p_fraud_pattern'],
+    balance_ton: 0.05, transactions_count: 1203, wallet_age_days: 180,
+    first_seen: '2024-04-25', last_activity: '2024-10-22',
+    story: 'BLACKLISTED. Mixer usage + sanctioned address interaction detected.'
+  }
+};
+
+function enrichDemo(preset) {
+  const d = Object.assign({}, preset);
+  d.flag_labels = d.flags.map(f => tr('flagLabels')[f] || f);
+  d.rank_percentile = d.trust_score >= 90 ? 5 : d.trust_score >= 75 ? 15 : d.trust_score >= 60 ? 35 : d.trust_score >= 40 ? 65 : 90;
+  d.metrics = {
+    balance_ton: d.balance_ton,
+    transactions_count: d.transactions_count,
+    wallet_age_days: d.wallet_age_days,
+    volume_ton: Math.round(d.transactions_count * (d.balance_ton + 0.5) * 10) / 10,
+    unique_peers: Math.max(3, Math.floor(d.transactions_count / 4))
+  };
+  const r = d.risk_score;
+  d.radar = {
+    Age: Math.min(100, d.wallet_age_days / 730 * 100),
+    Activity: Math.min(100, d.transactions_count / 500 * 100),
+    Volume: Math.min(100, d.metrics.volume_ton / 1000 * 100),
+    Network: Math.min(100, d.metrics.unique_peers / 200 * 100),
+    Compliance: Math.max(0, 100 - r * 1.2)
+  };
+  d.recent_transactions = [
+    { date: '2024-10-23 14:02', direction: 'in', amount_ton: 12.4 },
+    { date: '2024-10-22 09:31', direction: 'out', amount_ton: 3.1 },
+    { date: '2024-10-21 18:47', direction: 'in', amount_ton: 0.5 },
+    { date: '2024-10-20 11:12', direction: 'in', amount_ton: 27.0 },
+    { date: '2024-10-19 22:05', direction: 'out', amount_ton: 1.2 }
+  ];
+  return d;
+}
+
+/* ════════════════ ХЕЛПЕРЫ ════════════════ */
+
+const $ = id => document.getElementById(id);
+
+function truncateAddress(addr) {
+  if (!addr || addr.length <= 12) return addr || '—';
+  return addr.slice(0, 6) + '…' + addr.slice(-4);
+}
+
+function fmtAmount(v) {
+  if (v == null) return '—';
+  // крошечные значения не превращаем в 0
+  if (v > 0 && v < 0.001) return '< 0.001';
+  // длинные дроби ломают сетку — аккуратно режем до 4 знаков
+  if (typeof v === 'number' && Number.isFinite(v) && v !== 0) return parseFloat(v.toFixed(4));
+  return v;
+}
+
+function getRiskColor(level) {
+  switch (level) {
+    case 'clean': return { text: 'text-[#00E676]', bg: 'bg-[#00E67620]', border: 'border-[#00E67640]', ring: '#00E676' };
+    case 'low': return { text: 'text-[#FFD600]', bg: 'bg-[#FFD60020]', border: 'border-[#FFD60040]', ring: '#FFD600' };
+    case 'medium': return { text: 'text-[#FF9F43]', bg: 'bg-[#FF9F4320]', border: 'border-[#FF9F4340]', ring: '#FF9F43' };
+    case 'high': return { text: 'text-[#FF3D57]', bg: 'bg-[#FF3D5720]', border: 'border-[#FF3D5740]', ring: '#FF3D57' };
+    case 'critical': return { text: 'text-[#FF3D57]', bg: 'bg-[#FF3D5730]', border: 'border-[#FF3D5760]', ring: '#FF3D57' };
+    default: return { text: 'text-[#8B93A7]', bg: 'bg-[#252B3B]', border: 'border-[#252B3B]', ring: '#8B93A7' };
+  }
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(currentLang === 'ru' ? 'ru-RU' : 'en-US', { day: '2-digit', month: 'short', year: '2-digit' });
+}
+
+let toastTimer = null;
+function showToast(message, type) {
+  const el = $('toast');
+  el.textContent = message;
+  hydrateEmoji(el);
+  el.classList.remove('translate-y-16', 'opacity-0');
+  if (type === 'error') { el.style.borderColor = '#FF3D5760'; }
+  else { el.style.borderColor = '#252B3B'; }
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('translate-y-16', 'opacity-0'), 2600);
+}
+
+function apiHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (TG && TG.initData) h['X-Telegram-Init-Data'] = TG.initData;
+  return h;
+}
+
+async function apiFetch(path, options) {
+  const resp = await fetch(API + path, options);
+  if (resp.status === 402) { openPaywall(); throw new Error('PRO required'); }
+  if (resp.status === 401) { showToast('🔑 Нет авторизации: запусти API с DEV_BYPASS_AUTH=true', 'error'); throw new Error('unauthorized'); }
+  if (resp.status === 429) { showToast(tr('toast_limit'), 'error'); throw new Error('limit'); }
+  if (!resp.ok) { showToast(tr('toast_error'), 'error'); throw new Error('api ' + resp.status); }
+  return resp.json();
+}
+
+/* ════════════════ СОСТОЯНИЕ ════════════════ */
+
+const state = {
+  user: { is_pro: false, scans_today: 0, scans_limit: 3, full_name: 'Demo User', telegram_id: 0 },
+  lastScan: null,       // результат последнего скана
+  lastAddress: null,
+  history: [],          // demo-история в памяти
+  tab: 'scanner'
+};
+
+/* ════════════════ ТАБЫ ════════════════ */
+
+function switchTab(tabName) {
+  state.tab = tabName;
+  ['scanner', 'passport', 'history', 'profile'].forEach(t => {
+    $('screen-' + t).classList.toggle('hidden', t !== tabName);
+  });
+  document.querySelectorAll('.nav-tab').forEach(btn => {
+    const active = btn.getAttribute('data-tab') === tabName;
+    btn.classList.toggle('text-[#00E676]', active);
+    btn.classList.toggle('font-bold', active);
+    btn.classList.toggle('text-[#4A5268]', !active);
+  });
+  if (tabName === 'passport') {
+    if (state.lastAddress) {
+      $('passport-empty').classList.add('hidden');
+      $('passport-content').classList.remove('hidden');
+      loadPassport(state.lastAddress);
+    } else {
+      $('passport-content').classList.add('hidden');
+      $('passport-empty').classList.remove('hidden');
+      hydrateEmoji($('passport-empty'));
+    }
+  }
+  if (tabName === 'history') loadHistory();
+  if (tabName === 'profile') loadProfile();
+  window.scrollTo({ top: 0 });
+}
+
+document.querySelectorAll('.nav-tab').forEach(btn =>
+  btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')))
+);
+
+/* ════════════════ SCANNER ════════════════ */
+
+const ADDRESS_RE = /^(EQ|UQ)[A-Za-z0-9_-]{46}$|^0:[0-9a-fA-F]{64}$|^T[1-9A-HJ-NP-Za-km-z]{33}$/;
+
+async function scanWallet(address) {
+  if (IS_DEMO && !REAL_MODE) {
+    const preset = Object.values(DEMO_PRESETS).find(p => p.address === address) ||
+                   DEMO_PRESETS[address] || DEMO_PRESETS.clean;
+    showLoader(true);
+    await new Promise(r => setTimeout(r, 900)); // имитация анализа
+    showLoader(false);
+    const data = enrichDemo(preset);
+    state.lastScan = data;
+    state.lastAddress = data.address;
+    state.history.unshift({ address: data.address, risk_level: data.risk_level, trust_score: data.trust_score, created_at: new Date().toISOString(), is_demo: true });
+    showScanResult(data);
+    return;
+  }
+
+  if (!ADDRESS_RE.test(address)) { showToast(tr('toast_invalid'), 'error'); return; }
+  showLoader(true);
+  try {
+    const data = await apiFetch('/api/scan', {
+      method: 'POST', headers: apiHeaders(), body: JSON.stringify({ address })
+    });
+    state.lastScan = data;
+    state.lastAddress = address;
+    state.user.scans_today = (state.user.scans_today || 0) + 1;
+    loadPassportDataFromScan(data, address);
+    await loadProfile();
+  } catch (e) { /* уже показан toast */ }
+  finally { showLoader(false); }
+}
+
+function loadPassportDataFromScan(scan, address) {
+  const flags = scan.flags || [];
+  const data = {
+    address: address,
+    trust_score: scan.trust_score, risk_score: scan.risk_score,
+    risk_level: scan.risk_level, flags,
+    network: scan.network,
+    flag_labels: flags.map(f => tr('flagLabels')[f] || f),
+    story: '',
+    metrics: scan.metrics || {}
+  };
+  showScanResult(data);
+}
+
+function showLoader(visible) {
+  $('scan-loader').classList.toggle('hidden', !visible);
+  if (visible) { $('scan-result').classList.add('hidden'); }
+}
+
+function showScanResult(data) {
+  const color = getRiskColor(data.risk_level);
+  const score = Math.round(data.trust_score || 0);
+
+  $('res-address').textContent = truncateAddress(data.address);
+  const badge = $('res-risk-badge');
+  badge.textContent = tr('level')[data.risk_level] || data.risk_level;
+  badge.className = 'inline-flex items-center gap-1 text-xs font-bold rounded-full px-3 py-1 border flex-shrink-0 ' + color.bg + ' ' + color.text + ' ' + color.border;
+
+  const arc = $('res-ring-arc');
+  arc.style.stroke = color.ring;
+  arc.style.strokeDashoffset = '314';
+  $('res-ring-value').textContent = '0';
+  $('res-progress').style.width = '0%';
+
+  $('scan-result').classList.remove('hidden');
+  $('scan-result').classList.remove('card-enter'); void $('scan-result').offsetWidth;
+  $('scan-result').classList.add('card-enter');
+
+  setTimeout(() => {
+    arc.style.strokeDashoffset = String(314 - 314 * score / 100);
+    $('res-ring-value').textContent = String(score);
+    $('res-progress').style.width = score + '%';
+  }, 60);
+
+  $('res-story').textContent = data.story || '';
+
+  const flagsCard = $('res-flags-card');
+  const flagsEl = $('res-flags');
+  flagsEl.innerHTML = '';
+  const flags = data.flags || [];
+  const labels = data.flag_labels && data.flag_labels.length ? data.flag_labels : flags.map(f => tr('flagLabels')[f] || f);
+  if (flags.length) {
+    flagsCard.classList.remove('hidden');
+    flags.forEach((f, i) => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-2 text-xs text-[#FFB0B8] bg-white/[0.06] rounded-lg px-3 py-2';
+      row.textContent = '• ' + (labels[i] || f);
+      flagsEl.appendChild(row);
+    });
+  } else {
+    flagsCard.classList.remove('hidden');
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 text-xs text-[#00E676] bg-white/[0.06] rounded-lg px-3 py-2';
+    row.textContent = '✅ ' + tr('no_flags');
+    flagsEl.appendChild(row);
+  }
+  hydrateEmoji($('scan-result'));
+}
+
+$('btn-scan').addEventListener('click', () => scanWallet($('scanner-input').value.trim()));
+$('scanner-input').addEventListener('keydown', e => { if (e.key === 'Enter') scanWallet(e.target.value.trim()); });
+
+document.querySelectorAll('.preset-btn').forEach(btn =>
+  btn.addEventListener('click', () => { $('scanner-input').value = DEMO_PRESETS[btn.getAttribute('data-preset')].address; scanWallet(DEMO_PRESETS[btn.getAttribute('data-preset')].address); })
+);
+
+$('btn-new-scan').addEventListener('click', () => {
+  $('scan-result').classList.add('hidden');
+  $('scanner-input').value = '';
+  $('scanner-input').focus();
+});
+
+$('btn-view-passport').addEventListener('click', () => {
+  if (!state.lastScan) return;
+  switchTab('passport');
+});
+
+$('btn-passport-go-scan').addEventListener('click', () => switchTab('scanner'));
+
+/* ════════════════ PASSPORT ════════════════ */
+
+async function loadPassport(address) {
+  if (IS_DEMO && !REAL_MODE) {
+    const preset = Object.values(DEMO_PRESETS).find(p => p.address === address) || DEMO_PRESETS.clean;
+    renderPassport(enrichDemo(preset), false);
+    return;
+  }
+  try {
+    const data = await apiFetch('/api/passport/' + encodeURIComponent(address), { headers: apiHeaders() });
+    renderPassport(data, true);
+  } catch (e) { /* toast/paywall уже показаны */ }
+}
+
+function renderPassport(pp, isPro) {
+  const cur = pp.network === 'TRON' ? 'TRX' : 'TON';
+  $('passport-empty').classList.add('hidden');
+  $('passport-content').classList.remove('hidden');
+  $('pp-avatar-initials').textContent = (pp.address || '--').slice(0, 2).toUpperCase();
+  $('pp-address').textContent = truncateAddress(pp.address);
+  $('pp-score').textContent = String(Math.round(pp.trust_score || 0));
+  const color = getRiskColor(pp.risk_level);
+  $('pp-score').style.color = color.ring;
+  $('pp-label').textContent = pp.label || tr('level')[pp.risk_level] || '';
+  $('pp-rank').textContent = '🏆 TOP ' + (pp.rank_percentile != null ? pp.rank_percentile : Math.max(1, 100 - Math.round(pp.trust_score || 0))) + '%';
+
+  drawRadarChart(pp.radar || {});
+
+  const m = pp.metrics || {};
+  const metrics = [
+    { icon: '📅', label: tr('metric_age'), value: (m.wallet_age_days != null ? m.wallet_age_days : '—') + ' ' + tr('days') },
+    { icon: '💎', label: tr('metric_balance'), value: fmtAmount(m.balance_ton) + ' ' + cur },
+    { icon: '🔄', label: tr('metric_txs'), value: m.transactions_count != null ? m.transactions_count + (m.transactions_more ? '+' : '') : '—' },
+    { icon: '📊', label: tr('metric_volume'), value: fmtAmount(m.volume_ton) + ' ' + cur },
+    { icon: '👥', label: tr('metric_peers'), value: m.unique_peers != null ? m.unique_peers : '—' },
+    { icon: '🏆', label: tr('metric_rank'), value: 'TOP ' + (pp.rank_percentile != null ? pp.rank_percentile : '—') + '%' }
+  ];
+  const mGrid = $('pp-metrics');
+  mGrid.innerHTML = '';
+  metrics.forEach(mt => {
+    const cell = document.createElement('div');
+    cell.className = 'glass hover:border-[#00E67640] transition-colors rounded-xl px-4 py-3 flex flex-col';
+    cell.innerHTML = '<span class="text-[10px] text-[#8B93A7]">' + mt.icon + ' ' + mt.label + '</span>' +
+                     '<span class="text-base font-bold mt-0.5">' + mt.value + '</span>';
+    mGrid.appendChild(cell);
+  });
+
+  const txEl = $('pp-txs');
+  txEl.innerHTML = '';
+  (pp.recent_transactions || []).forEach(tx => {
+    const isIn = tx.direction === 'in';
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between bg-white/[0.06] rounded-lg px-3 py-2';
+    row.innerHTML =
+      '<div class="flex items-center gap-2">' +
+      '<span class="text-sm">' + (isIn ? '📥' : '📤') + '</span>' +
+      '<span class="text-xs text-[#8B93A7]">' + (tx.date || '—') + '</span></div>' +
+      '<span class="text-xs font-bold ' + (isIn ? 'text-[#00E676]' : 'text-[#8B93A7]') + '">' +
+      (isIn ? '+' : '−') + fmtAmount(tx.amount_ton) + ' ' + cur + '</span>';
+    txEl.appendChild(row);
+  });
+
+  const lock = $('passport-lock');
+  if (IS_DEMO) {
+    // в демо паспорт открыт наполовину: показываем, но помечаем демо
+    lock.classList.add('hidden');
+  } else {
+    lock.classList.toggle('hidden', !!isPro);
+  }
+  hydrateEmoji($('passport-content'));
+}
+
+/* ════════════════ RADAR SVG ════════════════ */
+
+function drawRadarChart(scores) {
+  const svg = $('radar-svg');
+  const cx = 110, cy = 100, R = 72;
+  const axes = ['Age', 'Activity', 'Volume', 'Network', 'Compliance'];
+  const angle = i => -Math.PI / 2 + i * 2 * Math.PI / 5;
+
+  const pt = (i, v) => {
+    const r = R * Math.max(0, Math.min(100, v)) / 100;
+    return [cx + r * Math.cos(angle(i)), cy + r * Math.sin(angle(i))];
+  };
+
+  let inner = '';
+
+  // сетка: 3 вложенных пятиугольника
+  [33, 66, 100].forEach(level => {
+    const pts = axes.map((_, i) => pt(i, level).map(n => n.toFixed(1)).join(',')).join(' ');
+    inner += '<polygon points="' + pts + '" fill="none" stroke="#252B3B" stroke-width="1"/>';
+  });
+
+  // оси
+  axes.forEach((_, i) => {
+    const [x, y] = pt(i, 100);
+    inner += '<line x1="' + cx + '" y1="' + cy + '" x2="' + x.toFixed(1) + '" y2="' + y.toFixed(1) + '" stroke="#252B3B" stroke-width="1"/>';
+  });
+
+  // полигон данных
+  const vals = axes.map(a => scores[a] != null ? scores[a] : 0);
+  const dataPts = vals.map((v, i) => pt(i, v).map(n => n.toFixed(1)).join(',')).join(' ');
+  inner += '<polygon points="' + dataPts + '" fill="#00E67625" stroke="#00E676" stroke-width="2"/>';
+  vals.forEach((v, i) => {
+    const [x, y] = pt(i, v);
+    inner += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="#00E676"/>';
+  });
+
+  // подписи
+  axes.forEach((a, i) => {
+    const [x, y] = pt(i, 122);
+    const anchor = Math.abs(x - cx) < 6 ? 'middle' : (x > cx ? 'start' : 'end');
+    inner += '<text x="' + x.toFixed(1) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="' + anchor + '" fill="#8B93A7" font-size="9" font-weight="600">' + a + '</text>';
+  });
+
+  svg.innerHTML = inner;
+}
+
+/* ════════════════ HISTORY ════════════════ */
+
+async function loadHistory() {
+  if (IS_DEMO && !REAL_MODE) {
+    renderHistory(state.history);
+    $('history-lock').classList.add('hidden');
+    return;
+  }
+  try {
+    const data = await apiFetch('/api/user/history', { headers: apiHeaders() });
+    $('history-lock').classList.add('hidden');
+    renderHistory(data.items || []);
+  } catch (e) {
+    if (e.message === 'PRO required') {
+      $('history-lock').classList.remove('hidden');
+      $('history-list').innerHTML = '';
+    }
+  }
+}
+
+function renderHistory(items) {
+  const list = $('history-list');
+  list.innerHTML = '';
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'glass hover:border-[#00E67640] transition-colors rounded-2xl p-6 text-center text-xs text-[#8B93A7]';
+    empty.textContent = tr('history_empty');
+    list.appendChild(empty);
+    return;
+  }
+  items.forEach(it => {
+    const color = getRiskColor(it.risk_level);
+    const row = document.createElement('div');
+    row.className = 'glass hover:border-[#00E67640] transition-colors rounded-xl px-4 py-3 flex items-center justify-between';
+    row.innerHTML =
+      '<div><div class="text-xs font-bold font-mono">' + truncateAddress(it.address) + '</div>' +
+      '<div class="text-[10px] text-[#4A5268] mt-0.5">' + formatDate(it.created_at) + (it.is_demo ? ' · DEMO' : '') + '</div></div>' +
+      '<div class="flex items-center gap-2">' +
+      '<span class="text-xs font-bold ' + color.text + '">' + Math.round(it.trust_score || 0) + '</span>' +
+      '<span class="text-[10px] font-bold rounded-full px-2 py-0.5 border ' + color.bg + ' ' + color.text + ' ' + color.border + '">' + (tr('level')[it.risk_level] || it.risk_level) + '</span>' +
+      '</div>';
+    list.appendChild(row);
+  });
+  hydrateEmoji($('history-list'));
+}
+
+/* ════════════════ PROFILE ════════════════ */
+
+async function loadProfile() {
+  if (IS_DEMO && !REAL_MODE) { renderProfile(state.user); return; }
+  try {
+    const u = await apiFetch('/api/user/me', { headers: apiHeaders() });
+    state.user = u;
+    renderProfile(u);
+  } catch (e) { /* toast показан */ }
+}
+
+function renderProfile(u) {
+  $('pr-name').textContent = u.full_name || u.username || (IS_DEMO ? 'Demo User' : 'User');
+  $('pr-id').textContent = 'ID ' + (u.telegram_id || 0);
+
+  // Витрина (демо без API): подписочная система скрыта, весь функционал открыт
+  if (IS_DEMO && !REAL_MODE) {
+    $('pr-status-badge').classList.add('hidden');
+    $('pr-pro-until').classList.add('hidden');
+    $('pr-limits-block').classList.add('hidden');
+    $('profile-upgrade').classList.add('hidden');
+    $('row-pro').classList.add('hidden');
+    $('header-pro-badge').classList.add('hidden');
+    hydrateEmoji($('screen-profile'));
+    return;
+  }
+
+  const badge = $('pr-status-badge');
+  const isPro = !!u.is_pro;
+  if (isPro) {
+    badge.textContent = '⭐ PRO';
+    badge.className = 'inline-flex items-center gap-1 bg-[#00E67620] text-[#00E676] text-xs font-bold rounded-full px-3 py-1 border border-[#00E67640]';
+    $('pr-pro-until').classList.remove('hidden');
+    $('pr-pro-until').textContent = tr('pro_until').replace('{date}', formatDate(u.pro_expires_at));
+    $('profile-upgrade').classList.add('hidden');
+    $('header-pro-badge').classList.remove('hidden');
+  } else {
+    badge.textContent = '🔒 LIMITED';
+    badge.className = 'inline-flex items-center gap-1 bg-[#FFD60020] text-[#FFD600] text-xs font-bold rounded-full px-3 py-1 border border-[#FFD60040]';
+    $('pr-pro-until').classList.add('hidden');
+    $('profile-upgrade').classList.remove('hidden');
+    $('header-pro-badge').classList.add('hidden');
+  }
+
+  const limit = u.scans_limit || 3;
+  const used = u.scans_today || 0;
+  $('pr-scans-text').textContent = used + '/' + limit;
+  $('pr-scans-progress').style.width = Math.min(100, used / limit * 100) + '%';
+
+  $('pr-limits-block').classList.remove('hidden');
+  $('row-pro').classList.remove('hidden');
+  const proStatus = $('row-pro-status');
+  if (isPro) {
+    proStatus.textContent = '✓ ' + tr('pro_active');
+    proStatus.className = 'text-xs font-bold text-[#00E676]';
+  } else {
+    proStatus.innerHTML = '<svg class="w-4 h-4 text-[#4A5268]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+    proStatus.className = 'flex items-center';
+  }
+  hydrateEmoji($('screen-profile'));
+}
+
+/* ════════════════ PAYWALL / ОПЛАТА ════════════════ */
+
+function openPaywall() { $('paywall').classList.remove('hidden'); }
+function closePaywall() { $('paywall').classList.add('hidden'); }
+
+$('btn-close-paywall').addEventListener('click', closePaywall);
+$('btn-upgrade-profile').addEventListener('click', openPaywall);
+$('btn-unlock-passport').addEventListener('click', openPaywall);
+$('btn-unlock-history').addEventListener('click', openPaywall);
+
+async function buyPro(plan) {
+  if (IS_DEMO && !REAL_MODE) { showToast(tr('toast_demo_pay')); return; }
+  try {
+    const data = await apiFetch('/api/user/invoice', {
+      method: 'POST', headers: apiHeaders(), body: JSON.stringify({ plan })
+    });
+    if (TG && TG.openInvoice && data.invoice_url) {
+      TG.openInvoice(data.invoice_url, status => {
+        if (status === 'paid') { closePaywall(); loadProfile(); showToast('🎉 PRO activated'); }
+      });
+    } else if (data.invoice_url) {
+      window.location.href = data.invoice_url;
+    }
+  } catch (e) { /* toast показан */ }
+}
+
+$('btn-buy-week').addEventListener('click', () => buyPro('pro_week'));
+$('btn-buy-month').addEventListener('click', () => buyPro('pro_month'));
+$('btn-buy-year').addEventListener('click', () => buyPro('pro_year'));
+
+$('btn-restore').addEventListener('click', () => {
+  if (IS_DEMO && !REAL_MODE) { showToast(tr('toast_demo_pay')); return; }
+  loadProfile().then(() => showToast(state.user.is_pro ? '✅ PRO' : '❌'));
+});
+
+/* ════════════════ ПРОЧЕЕ МЕНЮ ════════════════ */
+
+$('row-support').addEventListener('click', () => {
+  window.open('https://t.me/CryptoPassApp_support', '_blank');
+});
+
+$('row-pro').addEventListener('click', () => {
+  if (IS_DEMO && !REAL_MODE) return;
+  openPaywall();
+});
+
+$('row-about').addEventListener('click', () => $('about-overlay').classList.remove('hidden'));
+$('btn-close-about').addEventListener('click', () => $('about-overlay').classList.add('hidden'));
+
+$('row-share').addEventListener('click', () => {
+  const url = 'https://t.me/CryptoPassApp';
+  if (TG && TG.openTelegramLink) { TG.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(url)); }
+  else if (navigator.share) { navigator.share({ url }).catch(() => {}); }
+  else { showToast(tr('toast_shared')); }
+});
+
+/* ════════════════ ЯЗЫК ════════════════ */
+
+function updateLangButtons() {
+  const on = 'text-[#00E676] bg-[#00E67620] border-[#00E67640]';
+  const off = 'text-[#8B93A7] bg-transparent border-[#252B3B]';
+  $('lang-ru').className = 'text-xs font-bold rounded-full px-3 py-1 border transition-colors ' + (currentLang === 'ru' ? on : off);
+  $('lang-en').className = 'text-xs font-bold rounded-full px-3 py-1 border transition-colors ' + (currentLang === 'en' ? on : off);
+}
+
+async function switchLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('lang', lang);
+  applyI18n();
+  showToast(tr('toast_lang'));
+  if (!IS_DEMO) {
+    try {
+      await apiFetch('/api/user/language', {
+        method: 'POST', headers: apiHeaders(), body: JSON.stringify({ language: lang })
+      });
+    } catch (e) { /* не критично */ }
+  }
+  // перерисовать текущие данные новыми подписями
+  if (state.lastScan) showScanResult(state.lastScan);
+  renderProfile(state.user);
+}
+
+$('lang-ru').addEventListener('click', e => { e.stopPropagation(); switchLanguage('ru'); });
+$('lang-en').addEventListener('click', e => { e.stopPropagation(); switchLanguage('en'); });
+
+/* ════════════════ СТАРТ ════════════════ */
+
+applyI18n();
+
+(async () => {
+  if (IS_DEMO && IS_LOCALHOST) {
+    try {
+      const h = await fetch(API + '/health');
+      if (h.ok) {
+        REAL_MODE = true; // локальный API запущен — работаем с реальными данными
+        await loadProfile();
+        return;
+      }
+    } catch (e) { /* сервера нет — остаёмся в Demo Mode */ }
+  }
+  if (IS_DEMO) {
+    $('demo-banner').classList.remove('hidden');
+    $('demo-presets').classList.remove('hidden');
+    $('scanner-input').value = DEMO_PRESETS.clean.address;
+  } else {
+    loadProfile();
+  }
+})();
+switchTab('scanner');
+</script>
+</body>
+</html>
